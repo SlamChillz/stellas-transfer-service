@@ -4,6 +4,42 @@ A small internal transfer service for business banking. It moves money between a
 
 **Recommended for reviewers:** Docker and Docker Compose (v2). You can run the app and all tests without installing Node.js or Postgres. (For local development you can use Node.js 22 and PostgreSQL 14+.) The app is written in TypeScript and uses Express, Sequelize, and Zod.
 
+**API docs:** [Stellas Internal Transfer Service API](https://documenter.getpostman.com/view/43502486/2sBXcEkfqS) (Postman) — request reference and try-it-out in the browser. Local collection: `postman/Stellas-Transfer-API.postman_collection.json` (set `base_url`, `source_account_id` = `9816b2b9-8db7-44cc-abdc-172fde645d32`, `destination_account_id` = `8a6823d7-c652-4d67-8859-0e62ae5b8f52`).
+
+---
+
+## Table of contents
+
+- [Quick start (Docker — recommended)](#quick-start-docker--recommended)
+- [Running without Docker (local Node + Postgres)](#running-without-docker-local-node--postgres)
+- [Demo accounts](#demo-accounts)
+- [Environment variables](#environment-variables)
+- [Tests](#tests)
+- [How the code is structured](#how-the-code-is-structured)
+- [Transactions and locking](#transactions-and-locking)
+- [Trade-offs and assumptions](#trade-offs-and-assumptions)
+- [Design: transactional integrity, concurrency, idempotency, and ledger](#design-transactional-integrity-concurrency-idempotency-and-ledger)
+  - [Transactional integrity](#transactional-integrity)
+  - [Concurrency safety](#concurrency-safety)
+  - [Idempotency design](#idempotency-design)
+  - [Ledger correctness](#ledger-correctness)
+- [API](#api)
+  - [Health](#health)
+  - [Create a transfer](#create-a-transfer)
+  - [Get account](#get-account)
+  - [Update account status](#update-account-status)
+  - [Get transfer by ID](#get-transfer-by-id)
+  - [Get transfer by reference](#get-transfer-by-reference)
+  - [List transfers for account](#list-transfers-for-account)
+  - [List ledger entries for account](#list-ledger-entries-for-account)
+  - [Example requests (curl)](#example-requests-curl)
+- [What's in this repo](#whats-in-this-repo)
+- [Implementation overview](#implementation-overview)
+  - [Functional requirements](#functional-requirements)
+  - [Non-functional requirements](#non-functional-requirements)
+  - [Testing requirements](#testing-requirements)
+  - [Important constraints (all satisfied)](#important-constraints-all-satisfied)
+
 ---
 
 ## Quick start (Docker — recommended)
@@ -360,13 +396,6 @@ curl -s -X POST http://localhost:3000/api/v1/transfers \
 
 ---
 
-### Postman
-
-**Published API docs:** [Stellas Internal Transfer Service API](https://documenter.getpostman.com/view/43502486/2sBXcEkfqS) — request reference and try-it-out in the browser.
-
-**Local collection:** Import `postman/Stellas-Transfer-API.postman_collection.json`. Set the collection variables: `base_url` (e.g. `http://localhost:3000`), `source_account_id` = `9816b2b9-8db7-44cc-abdc-172fde645d32`, `destination_account_id` = `8a6823d7-c652-4d67-8859-0e62ae5b8f52`, then run the requests.
-
----
 
 ## What’s in this repo
 
