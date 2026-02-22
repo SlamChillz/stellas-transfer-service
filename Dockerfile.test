@@ -1,0 +1,16 @@
+# Test runner: full deps, source + tests, runs against Docker DB
+FROM node:22-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY tsconfig.json jest.config.js .sequelizerc ./
+COPY src ./src
+COPY tests ./tests
+COPY database ./database
+COPY scripts ./scripts
+
+# Ensure test DB exists, run migrations, then run tests (default)
+CMD node scripts/ensure-test-db.js && npm run db:migrate && npm test

@@ -1,0 +1,254 @@
+{
+  "info": {
+    "name": "Stellas Transfer API",
+    "description": "Internal Transfer Service – Business Banking.\n\n**Setup:** Set `base_url` in collection or environment (e.g. `http://localhost:3000`).\n\n**Workflow:** 1) Create Account (run twice, copy `data.account.id` into `source_account_id` and `destination_account_id`). 2) Top-up Balance on source (and optionally destination). 3) Create Transfer. 4) Use **Accounts** (Get Account, Update Status, List Transfers, List Ledger Entries) and **Transfers** (Get by ID, Get by Reference) to read or update data. 5) (Optional) Run **Concurrency demo** → **Concurrent transfers (bidirectional)** to exercise bidirectional concurrent transfers.\n\n**Errors:** All error responses include `type`, `code`, and `message`. In development, `type` is a URL to the in-app error reference: GET `{{base_url}}/docs` (or open the `type` link).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000" },
+    { "key": "source_account_id", "value": "" },
+    { "key": "destination_account_id", "value": "" },
+    { "key": "transfer_id", "value": "" },
+    { "key": "transfer_reference", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "General",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/health",
+            "description": "Returns service status, `version`, and `apiVersion`. Use for liveness checks."
+          }
+        },
+        {
+          "name": "Version",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/version",
+            "description": "Returns `version` and `apiVersion`."
+          }
+        },
+        {
+          "name": "Error reference (Docs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/docs",
+            "description": "HTML page listing all error codes and descriptions. Error responses in dev use a `type` URL fragment like `/docs#VALIDATION_ERROR`; open this page to see definitions."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transfers",
+      "item": [
+        {
+          "name": "Create Transfer (success)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source_account_id\": \"{{source_account_id}}\",\n  \"destination_account_id\": \"{{destination_account_id}}\",\n  \"amount\": 10000,\n  \"currency\": \"NGN\",\n  \"reference\": \"unique-ref-{{$randomInt}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/transfers",
+            "description": "Creates a transfer between two accounts. Body: `source_account_id`, `destination_account_id` (UUIDs), `amount` (positive number), `currency` (3-letter, must match both accounts), `reference` (unique string, used for idempotency). Response: 200 with `data.transfer` (id, reference, amount, currency, sourceAccountId, destinationAccountId, status, createdAt)."
+          }
+        },
+        {
+          "name": "Create Transfer – Idempotency",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source_account_id\": \"{{source_account_id}}\",\n  \"destination_account_id\": \"{{destination_account_id}}\",\n  \"amount\": 100,\n  \"currency\": \"NGN\",\n  \"reference\": \"idem-ref-same\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/transfers",
+            "description": "Run twice with the same `reference`. Second response returns the same transfer (same id) and does not create a duplicate."
+          }
+        },
+        {
+          "name": "Create Transfer – Idempotency conflict (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source_account_id\": \"{{source_account_id}}\",\n  \"destination_account_id\": \"{{destination_account_id}}\",\n  \"amount\": 200,\n  \"currency\": \"NGN\",\n  \"reference\": \"idem-ref-same\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/transfers",
+            "description": "**Prerequisite:** Run **Create Transfer – Idempotency** once so that a transfer with reference `idem-ref-same` exists. This request sends the same reference but a different amount (200 instead of 100). Expect 409 with `code`: `IDEMPOTENCY_CONFLICT` — the API rejects reuse of an idempotency key with a different request body.",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status is 409', function () { pm.response.to.have.status(409); });",
+                    "pm.test('Code is IDEMPOTENCY_CONFLICT', function () {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json.code).to.eql('IDEMPOTENCY_CONFLICT');",
+                    "  pm.expect(json.message).to.be.a('string');",
+                    "});"
+                  ],
+                  "type": "text/javascript"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Transfer – Insufficient balance (422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source_account_id\": \"{{source_account_id}}\",\n  \"destination_account_id\": \"{{destination_account_id}}\",\n  \"amount\": 99999999,\n  \"currency\": \"NGN\",\n  \"reference\": \"ref-big\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/transfers",
+            "description": "Expect 422. Response includes `code`: `INSUFFICIENT_BALANCE`, `type` (link to /docs in dev), `message`."
+          }
+        },
+        {
+          "name": "Create Transfer – Validation error (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source_account_id\": \"not-a-uuid\",\n  \"destination_account_id\": \"{{destination_account_id}}\",\n  \"amount\": 100,\n  \"currency\": \"NGN\",\n  \"reference\": \"ref\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/transfers",
+            "description": "Expect 400. Invalid UUID triggers `code`: `VALIDATION_ERROR`; response includes `details` and `type` (link to /docs in dev)."
+          }
+        },
+        {
+          "name": "Create Transfer – Currency mismatch (422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source_account_id\": \"{{source_account_id}}\",\n  \"destination_account_id\": \"{{destination_account_id}}\",\n  \"amount\": 100,\n  \"currency\": \"USD\",\n  \"reference\": \"ref-currency\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/transfers",
+            "description": "If both accounts are NGN, sending `currency`: `USD` returns 422 with `code`: `CURRENCY_MISMATCH`."
+          }
+        },
+        {
+          "name": "Get Transfer by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/transfers/{{transfer_id}}",
+            "description": "Returns one transfer by ID. Set collection variable transfer_id (e.g. from a previous Create Transfer response data.transfer.id). Response: 200 with data.transfer (id, reference, amount, currency, sourceAccountId, destinationAccountId, status, createdAt). 404 if not found."
+          }
+        },
+        {
+          "name": "Get Transfer by Reference",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/transfers?reference={{transfer_reference}}",
+            "description": "Returns one transfer by reference (idempotency key). Set collection variable transfer_reference. Query param reference is required. Response: 200 with data.transfer. 400 if reference missing; 404 if not found."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "Create Account",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"biz-{{$randomInt}}\",\n  \"currency\": \"NGN\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/accounts",
+            "description": "**Test-only.** Creates an account with zero balance. Body: `business_id` (required), `currency` (3-letter, e.g. NGN). Response: 201 with `data.account` (id, businessId, currency, availableBalance, ledgerBalance, status, createdAt, updatedAt). Copy `data.account.id` into collection variables for transfers. Disabled in production."
+          }
+        },
+        {
+          "name": "Top-up Balance",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100000\n}"
+            },
+            "url": "{{base_url}}/api/v1/accounts/{{source_account_id}}/top-up",
+            "description": "**Test-only.** Credits the account by `amount` (positive number). Updates both available and ledger balance and appends a CREDIT entry to the ledger. Response: 200 with updated `data.account`. Use `:id` in path (e.g. set `source_account_id`). Disabled in production."
+          }
+        },
+        {
+          "name": "Get Account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/accounts/{{source_account_id}}",
+            "description": "Returns one account by ID. Use source_account_id or any account UUID. Response: 200 with data.account (id, business_id, currency, available_balance, ledger_balance, status, created_at, updated_at). 404 if not found."
+          }
+        },
+        {
+          "name": "Update Account Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"FROZEN\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/accounts/{{source_account_id}}",
+            "description": "Updates account status. Body: { \"status\": \"ACTIVE\" | \"FROZEN\" | \"CLOSED\" }. Response: 200 with updated data.account. 404 if account not found; 400 for invalid status."
+          }
+        },
+        {
+          "name": "List Transfers for Account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/accounts/{{source_account_id}}/transfers?limit=20&offset=0",
+            "description": "Lists transfers where the account is source or destination. Query: limit (default 20, max 100), offset (default 0). Response: data.transfers array and meta (total, limit, offset). 404 if account not found."
+          }
+        },
+        {
+          "name": "List Ledger Entries for Account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/accounts/{{source_account_id}}/ledger-entries?limit=20&offset=0",
+            "description": "Lists ledger entries for the account. Query: limit (default 20, max 100), offset (default 0). Response: data.ledgerEntries array and meta (total, limit, offset). 404 if account not found."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Concurrency demo",
+      "item": [
+        {
+          "name": "Concurrent transfers (bidirectional)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source_account_id\": \"{{source_account_id}}\",\n  \"destination_account_id\": \"{{destination_account_id}}\",\n  \"currency\": \"NGN\",\n  \"source_to_dest\": { \"count\": 5, \"amount_per_transfer\": 1000 },\n  \"dest_to_source\": { \"count\": 5, \"amount_per_transfer\": 500 }\n}"
+            },
+            "url": "{{base_url}}/api/v1/demo/concurrent-transfers",
+            "description": "**Test-only.** Runs bidirectional concurrent transfers: N from source→destination and M from destination→source at the same time. Body: source_account_id, destination_account_id (UUIDs), currency, source_to_dest (object with count 1–100, amount_per_transfer), dest_to_source (same shape). Response 200: data.scenario, data.summary (duration_ms, balances before/after for both accounts, succeeded/failed per direction), data.transfers (each: reference, direction, amount, status, transfer_id or error_code/error_message). Requires test endpoints enabled. Disabled in production."
+          }
+        }
+      ]
+    }
+  ]
+}

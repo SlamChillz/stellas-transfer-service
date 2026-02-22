@@ -1,0 +1,91 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: stellas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-stellas_transfer}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-stellas_transfer}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-1.0.0}
+    container_name: stellas-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-stellas_transfer}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      RUN_MIGRATIONS_ON_START: ${RUN_MIGRATIONS_ON_START:-true}
+      RUN_SEED_ON_START: ${RUN_SEED_ON_START:-true}
+      # Enable account create / top-up endpoints when running Docker for local testing
+      ALLOW_TEST_ENDPOINTS: ${ALLOW_TEST_ENDPOINTS:-true}
+    ports:
+      - "${PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: stellas-test
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: test
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: stellas_transfer_test
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+    profiles:
+      - test
+
+  # Optional: DB admin UI (disable if not needed)
+  adminer:
+    image: adminer:latest
+    container_name: stellas-adminer
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DEFAULT_USERNAME: ${DB_USER:-postgres}
+      ADMINER_DEFAULT_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:

@@ -1,0 +1,18 @@
+node_modules
+dist
+.git
+.env
+.env.*
+!.env.example
+*.log
+coverage
+.nyc_output
+.cache
+.idea
+.vscode
+*.md
+!README.md
+# tests/ and *.test.ts included for Dockerfile.test; production Dockerfile does not COPY them
+Dockerfile*
+docker-compose*
+.dockerignore
