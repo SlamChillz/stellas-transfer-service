@@ -4,7 +4,7 @@ A small internal transfer service for business banking. It moves money between a
 
 **Recommended for reviewers:** Docker and Docker Compose (v2). You can run the app and all tests without installing Node.js or Postgres. (For local development you can use Node.js 22 and PostgreSQL 14+.) The app is written in TypeScript and uses Express, Sequelize, and Zod.
 
-**API docs:** [Stellas Internal Transfer Service API](https://documenter.getpostman.com/view/43502486/2sBXcEkfqS) (Postman) — request reference and try-it-out in the browser. Local collection: `postman/Stellas-Transfer-API.postman_collection.json` (set `base_url`, `source_account_id` = `9816b2b9-8db7-44cc-abdc-172fde645d32`, `destination_account_id` = `8a6823d7-c652-4d67-8859-0e62ae5b8f52`).
+**API docs:** [Stellas Internal Transfer Service API](https://documenter.getpostman.com/view/43502486/2sBXcEkgHt) (Postman) — request reference and try-it-out in the browser. Local collection: `postman/Stellas-Transfer-API.postman_collection.json` (set `base_url`, `source_account_id` = `9816b2b9-8db7-44cc-abdc-172fde645d32`, `destination_account_id` = `8a6823d7-c652-4d67-8859-0e62ae5b8f52`).
 
 ---
 
