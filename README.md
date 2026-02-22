@@ -119,15 +119,20 @@ The seeder creates two ACTIVE NGN accounts and credits each with **100000** (in 
 
 | Variable | What it does |
 |----------|----------------|
-| `PORT` | Port the server listens on (default 3000). |
 | `NODE_ENV` | `development`, `test`, or `production`. |
+| `PORT` | Port the server listens on (default 3000). |
 | `LOG_LEVEL` | Pino log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
+| `APP_VERSION` | App version (default `1.0.0`); shown in `/health` and `/version`. |
+| `RUN_MIGRATIONS_ON_START` | If `true`, run DB migrations when the app starts (default `true`). |
+| `RUN_SEED_ON_START` | If `true`, run DB seed when the app starts (default `false`; Docker uses `true`). |
+| `ALLOW_TEST_ENDPOINTS` | If `true`, enable test-only endpoints (create account, top-up, concurrency demo). Default `true`; auto-disabled in production. |
 | `DATABASE_URL` | Full Postgres URL. If set, the app uses it and ignores the `DB_*` vars below. |
 | `DB_HOST` | Postgres host (default `localhost`; in Docker the app gets `db`). |
 | `DB_PORT` | Postgres port (default 5432). |
 | `DB_NAME` | Database name (default `stellas_transfer`). |
 | `DB_USER` | Postgres user (default `postgres`). |
 | `DB_PASSWORD` | Postgres password. No default; set it in `.env`. |
+| `ADMINER_PORT` | Port for Adminer when using Docker `--profile tools` (default 8080). |
 
 ---
 
